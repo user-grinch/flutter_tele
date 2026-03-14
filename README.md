@@ -4,6 +4,8 @@ The github repo returns 404 page so I took code from pub.dev, here are the origi
 - [github](https://github.com/telefon-one/flutter_tele)
 - [pub.dev](https://pub.dev/packages/flutter_tele)
 
+This is a modified version of the flutter_tele package for use with the Rivo Dialer App
+
 # flutter_tele
 
 A Flutter plugin for telephony operations based on Android's InCallService and telecom APIs.
