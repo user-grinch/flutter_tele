@@ -54,14 +54,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_dialer:
-    dependency: "direct main"
-    description:
-      name: flutter_dialer
-      sha256: "7009e2d517fbdda770f7507d36d05ee22cf49f9c9dd830a5f91bbd1f0cd26bc8"
-      url: "https://pub.dev"
-    source: hosted
-    version: "2.0.0+101"
   flutter_lints:
     dependency: "direct dev"
     description:

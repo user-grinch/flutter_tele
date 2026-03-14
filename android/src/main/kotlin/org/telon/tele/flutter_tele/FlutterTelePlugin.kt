@@ -1,6 +1,9 @@
 package org.telon.tele.flutter_tele
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import io.flutter.plugin.common.PluginRegistry
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -10,20 +13,27 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import android.Manifest
+import android.app.Activity
+import android.app.role.RoleManager
 import android.content.pm.PackageManager
+import android.os.Build
+import android.telecom.TelecomManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 
 /** FlutterTelePlugin */
-class FlutterTelePlugin: FlutterPlugin, MethodCallHandler {
+class FlutterTelePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener {
   private lateinit var channel: MethodChannel
   private lateinit var eventChannel: EventChannel
   private lateinit var context: Context
+  private var activity: Activity? = null
   private var eventSink: EventChannel.EventSink? = null
+  private var pendingResult: Result? = null
 
   companion object {
     private const val TAG = "FlutterTelePlugin"
     private var instance: FlutterTelePlugin? = null
+    private const val REQUEST_CODE_SET_DEFAULT_DIALER = 123
     
     fun getInstance(): FlutterTelePlugin? {
       return instance
@@ -52,6 +62,16 @@ class FlutterTelePlugin: FlutterPlugin, MethodCallHandler {
     when (call.method) {
       "requestPermissions" -> requestPermissions(result)
       "hasPermissions" -> hasPermissions(result)
+      "isDefaultDialer" -> isDefaultDialer(result)
+      "setDefaultDialer" -> {
+        if (pendingResult != null) {
+          result.error("ALREADY_REQUESTING", "A dialer request is already in progress", null)
+          return
+        }
+        pendingResult = result
+        setDefaultDialer()
+      }
+      "canSetDefaultDialer" -> canSetDefaultDialer(result)
       "start" -> {
         val configuration = call.arguments as? Map<String, Any>
         startTelephonyService(configuration, result)
@@ -86,6 +106,94 @@ class FlutterTelePlugin: FlutterPlugin, MethodCallHandler {
         }
       }
       else -> result.notImplemented()
+    }
+  }
+
+  private fun isDefaultDialer(result: Result) {
+    try {
+      val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+      val isDefault = context.packageName == telecomManager.defaultDialerPackage
+      Log.d(TAG, "isDefaultDialer: $isDefault (packageName: ${context.packageName}, defaultDialer: ${telecomManager.defaultDialerPackage})")
+      result.success(isDefault)
+    } catch (e: Exception) {
+      Log.e(TAG, "Error checking default dialer", e)
+      result.error("DIALER_ERROR", "Failed to check default dialer", e.message)
+    }
+  }
+
+  private fun setDefaultDialer() {
+    val result = pendingResult
+    Log.d(TAG, "setDefaultDialer called, activity: $activity")
+    try {
+      if (activity == null) {
+        Log.e(TAG, "Cannot set default dialer: activity is null")
+        pendingResult = null
+        result?.error("NO_ACTIVITY", "Plugin is not attached to an activity", null)
+        return
+      }
+
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val roleManager = context.getSystemService(Context.ROLE_SERVICE) as RoleManager
+        val isRoleAvailable = roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)
+        val isRoleHeld = roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
+        Log.d(TAG, "RoleManager: isRoleAvailable=${isRoleAvailable}, isRoleHeld=${isRoleHeld}")
+        
+        if (isRoleAvailable && !isRoleHeld) {
+          val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+          activity?.startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_DIALER)
+          // Result will be handled in onActivityResult
+        } else {
+          Log.d(TAG, "Role not available or already held")
+          pendingResult = null
+          result?.success(isRoleHeld)
+        }
+      } else {
+        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+        val isDefault = context.packageName == telecomManager.defaultDialerPackage
+        Log.d(TAG, "Legacy TelecomManager: isDefault=${isDefault}")
+        
+        if (!isDefault) {
+          val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+          intent.putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, context.packageName)
+          activity?.startActivityForResult(intent, REQUEST_CODE_SET_DEFAULT_DIALER)
+          // Result will be handled in onActivityResult
+        } else {
+          pendingResult = null
+          result?.success(true)
+        }
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error setting default dialer", e)
+      pendingResult = null
+      result?.error("DIALER_ERROR", "Failed to set default dialer", e.message)
+    }
+  }
+
+  override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+    if (requestCode == REQUEST_CODE_SET_DEFAULT_DIALER) {
+      val result = pendingResult
+      pendingResult = null
+      
+      val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+      val isDefault = context.packageName == telecomManager.defaultDialerPackage
+      Log.d(TAG, "onActivityResult: resultCode=$resultCode, isDefaultDialer=$isDefault")
+      
+      result?.success(isDefault)
+      return true
+    }
+    return false
+  }
+
+  private fun canSetDefaultDialer(result: Result) {
+    try {
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+        result.success(true)
+      } else {
+        result.success(false)
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "Error checking if can set default dialer", e)
+      result.error("DIALER_ERROR", "Failed to check if can set default dialer", e.message)
     }
   }
 
@@ -217,5 +325,27 @@ class FlutterTelePlugin: FlutterPlugin, MethodCallHandler {
     channel.setMethodCallHandler(null)
     eventChannel.setStreamHandler(null)
     instance = null
+  }
+
+  override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+    Log.d(TAG, "onAttachedToActivity: ${binding.activity}")
+    activity = binding.activity
+    binding.addActivityResultListener(this)
+  }
+
+  override fun onDetachedFromActivityForConfigChanges() {
+    Log.d(TAG, "onDetachedFromActivityForConfigChanges")
+    activity = null
+  }
+
+  override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+    Log.d(TAG, "onReattachedToActivityForConfigChanges: ${binding.activity}")
+    activity = binding.activity
+    binding.addActivityResultListener(this)
+  }
+
+  override fun onDetachedFromActivity() {
+    Log.d(TAG, "onDetachedFromActivity")
+    activity = null
   }
 }

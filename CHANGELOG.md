@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.5+106
+
+* **IMPROVEMENT:** Replaced `flutter_dialer` dependency with native implementation in `flutter_tele`
+* Removed `flutter_dialer` dependency from `pubspec.yaml`
+* Implemented `isDefaultDialer`, `setDefaultDialer`, and `canSetDefaultDialer` directly in `FlutterTelePlugin.kt`
+* Added `ActivityAware` support to `FlutterTelePlugin` to handle activity-based intents
+
 ## 2.0.5+105
 
 * **NEW:** Added dialer replacement functionality integration with flutter_dialer
