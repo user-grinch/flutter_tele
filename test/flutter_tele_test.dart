@@ -14,73 +14,89 @@ void main() {
         'held': false,
         'muted': false,
         'speaker': false,
+        'creationTimeMillis': 1000,
+        'connectTimeMillis': 2000,
       };
 
       final call = TeleCall.fromMap(callData);
 
       expect(call.id, equals(1));
-      expect(call.state, equals('ACTIVE'));
+      expect(call.state, equals(CallState.connected));
       expect(call.remoteNumber, equals('+1234567890'));
       expect(call.remoteName, equals('Test User'));
-      expect(call.direction, equals('DIRECTION_INCOMING'));
+      expect(call.direction, equals(CallDirection.incoming));
       expect(call.held, equals(false));
       expect(call.muted, equals(false));
       expect(call.speaker, equals(false));
+      expect(call.creationTimeMillis, equals(1000));
+      expect(call.connectTimeMillis, equals(2000));
     });
 
     test('TeleCall.toMap returns correct map', () {
       final call = TeleCall(
         id: 1,
-        state: 'ACTIVE',
+        state: CallState.connected,
         remoteNumber: '+1234567890',
         remoteName: 'Test User',
-        direction: 'DIRECTION_INCOMING',
+        direction: CallDirection.incoming,
         held: false,
         muted: false,
         speaker: false,
+        creationTimeMillis: 1000,
+        connectTimeMillis: 2000,
       );
 
       final map = call.toMap();
 
       expect(map['id'], equals(1));
-      expect(map['state'], equals('ACTIVE'));
+      expect(map['state'], equals('CONNECTED'));
       expect(map['remoteNumber'], equals('+1234567890'));
       expect(map['remoteName'], equals('Test User'));
-      expect(map['direction'], equals('DIRECTION_INCOMING'));
+      expect(map['direction'], equals('INCOMING'));
       expect(map['held'], equals(false));
       expect(map['muted'], equals(false));
       expect(map['speaker'], equals(false));
+      expect(map['creationTimeMillis'], equals(1000));
+      expect(map['connectTimeMillis'], equals(2000));
     });
 
-    test('TeleCall duration formatting works correctly', () {
+    test('TeleCall duration calculation works correctly', () {
+      final now = DateTime.now().millisecondsSinceEpoch;
       final call = TeleCall(
         id: 1,
-        totalDuration: 125, // 2 minutes 5 seconds
-        creationTimeMillis: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+        state: CallState.connected,
+        remoteNumber: '+1234567890',
+        remoteName: 'Test User',
+        direction: CallDirection.incoming,
+        creationTimeMillis: now - 5000, // 5 seconds ago
+        connectTimeMillis: now - 3000, // 3 seconds ago
       );
 
-      // The duration calculation depends on current time, so we'll test the formatting function directly
-      expect(call.formatTime(125), equals('02:05'));
-      expect(call.formatTime(0), equals('00:00'));
-      expect(call.formatTime(3661), equals('61:01')); // 1 hour 1 second
+      expect(call.totalDuration.inSeconds, closeTo(5, 1));
+      expect(call.duration.inSeconds, closeTo(3, 1));
     });
 
-    test('TeleCall isTerminated returns correct value', () {
-      final activeCall = TeleCall(id: 1, state: 'ACTIVE');
-      final terminatedCall = TeleCall(id: 2, state: 'PJSIP_INV_STATE_DISCONNECTED');
+    test('TeleCall state mapping works correctly', () {
+      final activeCall = TeleCall(
+        id: 1,
+        state: CallState.connected,
+        remoteNumber: '',
+        remoteName: '',
+        direction: CallDirection.unknown,
+      );
+      final ringingCall = TeleCall(
+        id: 2,
+        state: CallState.ringing,
+        remoteNumber: '',
+        remoteName: '',
+        direction: CallDirection.unknown,
+      );
 
-      expect(activeCall.isTerminated(), equals(false));
-      expect(terminatedCall.isTerminated(), equals(true));
+      expect(activeCall.state, equals(CallState.connected));
+      expect(ringingCall.state, equals(CallState.ringing));
     });
 
-    test('TeleCall can be created with minimal parameters', () {
-      final call = TeleCall(id: 1);
-      expect(call.id, equals(1));
-      expect(call.state, isNull);
-      expect(call.remoteNumber, isNull);
-    });
-
-    test('TeleCall fromMap handles null values', () {
+    test('TeleCall fromMap handles minimal values', () {
       final callData = {
         'id': 1,
       };
@@ -88,20 +104,10 @@ void main() {
       final call = TeleCall.fromMap(callData);
 
       expect(call.id, equals(1));
-      expect(call.state, isNull);
-      expect(call.remoteNumber, isNull);
-      expect(call.remoteName, isNull);
-    });
-
-    test('TeleCall toMap handles null values', () {
-      final call = TeleCall(id: 1);
-
-      final map = call.toMap();
-
-      expect(map['id'], equals(1));
-      expect(map['state'], isNull);
-      expect(map['remoteNumber'], isNull);
-      expect(map['remoteName'], isNull);
+      expect(call.state, equals(CallState.unknown));
+      expect(call.direction, equals(CallDirection.unknown));
+      expect(call.remoteNumber, equals(''));
+      expect(call.remoteName, equals(''));
     });
   });
 }

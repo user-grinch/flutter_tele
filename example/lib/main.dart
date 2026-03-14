@@ -380,6 +380,13 @@ class _MyAppState extends State<MyApp> {
     super.dispose();
   }
 
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    String twoDigitMinutes = twoDigits(duration.inMinutes.remainder(60));
+    String twoDigitSeconds = twoDigits(duration.inSeconds.remainder(60));
+    return "$twoDigitMinutes:$twoDigitSeconds";
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -437,17 +444,6 @@ class _MyAppState extends State<MyApp> {
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 8),
-                              Text(
-                                'Can Set as Default',
-                                style: Theme.of(context).textTheme.titleLarge,
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                _canSetDefaultDialer ? 'This app can be set as default dialer' : 'This app cannot be set as default dialer',
-                                style: Theme.of(context).textTheme.bodyLarge,
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: 16),
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                                 children: [
@@ -461,12 +457,6 @@ class _MyAppState extends State<MyApp> {
                                     child: const Text('Refresh Status'),
                                   ),
                                 ],
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                'Note: Setting as default dialer will open the system settings dialog.',
-                                style: Theme.of(context).textTheme.bodySmall,
-                                textAlign: TextAlign.center,
                               ),
                             ],
                           ),
@@ -526,8 +516,10 @@ class _MyAppState extends State<MyApp> {
                         ),
                         const SizedBox(height: 8),
                         Text('ID: ${_currentCall!.id}'),
-                        Text('State: ${_currentCall!.state}'),
-                        Text('Remote: ${_currentCall!.remoteNumber ?? 'Unknown'}'),
+                        Text('State: ${_currentCall!.state.name}'),
+                        Text('Direction: ${_currentCall!.direction.name}'),
+                        Text('Remote: ${_currentCall!.remoteNumber}'),
+                        Text('Duration: ${_formatDuration(_currentCall!.duration)}'),
                         const SizedBox(height: 16),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -539,38 +531,6 @@ class _MyAppState extends State<MyApp> {
                             ElevatedButton(
                               onPressed: _hangupCall,
                               child: const Text('Hangup'),
-                            ),
-                            ElevatedButton(
-                              onPressed: _declineCall,
-                              child: const Text('Decline'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            ElevatedButton(
-                              onPressed: _muteCall,
-                              child: const Text('Mute'),
-                            ),
-                            ElevatedButton(
-                              onPressed: _unMuteCall,
-                              child: const Text('Unmute'),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                          children: [
-                            ElevatedButton(
-                              onPressed: _useSpeaker,
-                              child: const Text('Speaker'),
-                            ),
-                            ElevatedButton(
-                              onPressed: _useEarpiece,
-                              child: const Text('Earpiece'),
                             ),
                           ],
                         ),
@@ -599,8 +559,8 @@ class _MyAppState extends State<MyApp> {
                               final call = _calls[index];
                               return ListTile(
                                 title: Text('Call ${call.id}'),
-                                subtitle: Text('${call.state} - ${call.remoteNumber ?? 'Unknown'}'),
-                                trailing: Text(call.getFormattedTotalDuration()),
+                                subtitle: Text('${call.state.name} (${call.direction.name}) - ${call.remoteNumber}'),
+                                trailing: Text(_formatDuration(call.totalDuration)),
                               );
                             },
                           ),

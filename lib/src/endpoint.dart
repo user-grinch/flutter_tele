@@ -13,7 +13,6 @@ class TeleEndpoint {
     _setupEventChannel();
   }
 
-  /// Request phone permissions
   Future<bool> requestPermissions() async {
     try {
       print('FlutterTele: Requesting phone permissions');
@@ -31,7 +30,6 @@ class TeleEndpoint {
     }
   }
 
-  /// Check if phone permissions are granted
   Future<bool> hasPermissions() async {
     try {
       print('FlutterTele: Checking phone permissions');
@@ -83,7 +81,6 @@ class TeleEndpoint {
     }
   }
 
-  /// Returns a Stream for the specified event type
   Stream<dynamic> on(String eventType) {
     print('FlutterTele: Creating event stream for type: $eventType');
     if (!_eventControllers.containsKey(eventType)) {
@@ -93,7 +90,6 @@ class TeleEndpoint {
     return _eventControllers[eventType]!.stream;
   }
 
-  /// Start the telephony service with configuration
   Future<Map<String, dynamic>> start(Map<String, dynamic> configuration) async {
     try {
       print(
@@ -160,7 +156,6 @@ class TeleEndpoint {
     }
   }
 
-  /// Make an outgoing call
   Future<TeleCall> makeCall(
     int sim,
     String destination,
@@ -170,7 +165,6 @@ class TeleEndpoint {
     try {
       print('FlutterTele: Making call to $destination on SIM $sim');
 
-      // Use a Completer to wait for the actual call event from Android TelecomManager
       final completer = Completer<TeleCall>();
       late StreamSubscription subscription;
 
@@ -182,8 +176,7 @@ class TeleEndpoint {
         final call = TeleCall.fromMap(stringMap);
 
         // Ensure this is the call we just initiated
-        if (call.getRemoteNumber() == destination ||
-            call.getRemoteContact() == destination) {
+        if (call.remoteNumber == destination) {
           subscription.cancel();
           if (!completer.isCompleted) {
             completer.complete(call);
@@ -191,7 +184,6 @@ class TeleEndpoint {
         }
       });
 
-      // Set a 10 second timeout fallback in case the call placement fails silently
       Future.delayed(const Duration(seconds: 10), () {
         if (!completer.isCompleted) {
           subscription.cancel();
@@ -222,98 +214,87 @@ class TeleEndpoint {
     }
   }
 
-  /// Answer an incoming call
   Future<dynamic> answerCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('answerCall', call.getId());
+      return await _channel.invokeMethod('answerCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to answer call: ${e.message}');
     }
   }
 
-  /// Hangup a call
   Future<dynamic> hangupCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('hangupCall', call.getId());
+      return await _channel.invokeMethod('hangupCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to hangup call: ${e.message}');
     }
   }
 
-  /// Decline an incoming call
   Future<dynamic> declineCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('declineCall', call.getId());
+      return await _channel.invokeMethod('declineCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to decline call: ${e.message}');
     }
   }
 
-  /// Hold a call
   Future<dynamic> holdCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('holdCall', call.getId());
+      return await _channel.invokeMethod('holdCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to hold call: ${e.message}');
     }
   }
 
-  /// Unhold a call
   Future<dynamic> unholdCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('unholdCall', call.getId());
+      return await _channel.invokeMethod('unholdCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to unhold call: ${e.message}');
     }
   }
 
-  /// Mute a call
   Future<dynamic> muteCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('muteCall', call.getId());
+      return await _channel.invokeMethod('muteCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to mute call: ${e.message}');
     }
   }
 
-  /// Unmute a call
   Future<dynamic> unMuteCall(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('unMuteCall', call.getId());
+      return await _channel.invokeMethod('unMuteCall', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to unmute call: ${e.message}');
     }
   }
 
-  /// Use speaker for a call
   Future<dynamic> useSpeaker(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('useSpeaker', call.getId());
+      return await _channel.invokeMethod('useSpeaker', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to use speaker: ${e.message}');
     }
   }
 
-  /// Use earpiece for a call
   Future<dynamic> useEarpiece(TeleCall call) async {
     try {
-      return await _channel.invokeMethod('useEarpiece', call.getId());
+      return await _channel.invokeMethod('useEarpiece', call.id);
     } on PlatformException catch (e) {
       throw Exception('Failed to use earpiece: ${e.message}');
     }
   }
 
-  /// Send envelope command
   Future<String> sendEnvelope(TeleCall call) async {
     try {
-      final result = await _channel.invokeMethod('sendEnvelope', call.getId());
+      final result = await _channel.invokeMethod('sendEnvelope', call.id);
       return result.toString();
     } on PlatformException catch (e) {
       throw Exception('Failed to send envelope: ${e.message}');
     }
   }
 
-  /// Dispose the endpoint and clean up resources
   void dispose() {
     _eventSubscription?.cancel();
     for (final controller in _eventControllers.values) {

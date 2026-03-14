@@ -301,8 +301,13 @@ class TeleService : InCallService() {
             state = stateStr,
             direction = direction,
             remoteNumber = remoteNumber,
-            remoteName = remoteName
+            remoteName = remoteName,
+            creationTimeMillis = call.details.creationTimeMillis
         )
+        
+        if (call.state == Call.STATE_ACTIVE) {
+            teleCall.connectTimeMillis = call.details.connectTimeMillis
+        }
         
         mCalls.add(teleCall)
         callMapping[teleCall.id] = call
@@ -317,7 +322,12 @@ class TeleService : InCallService() {
                 teleCall.state = when (state) {
                     Call.STATE_RINGING -> "RINGING"
                     Call.STATE_DISCONNECTED -> "DISCONNECTED"
-                    Call.STATE_ACTIVE -> "ACTIVE"
+                    Call.STATE_ACTIVE -> {
+                        if (teleCall.connectTimeMillis == 0L) {
+                            teleCall.connectTimeMillis = call.details.connectTimeMillis
+                        }
+                        "ACTIVE"
+                    }
                     Call.STATE_HOLDING -> "HOLDING"
                     Call.STATE_DIALING -> "DIALING"
                     Call.STATE_CONNECTING -> "CONNECTING"
@@ -375,7 +385,9 @@ data class TeleCall(
     var speaker: Boolean? = null,
     val direction: String? = null,
     var remoteNumber: String? = null,
-    var remoteName: String? = null
+    var remoteName: String? = null,
+    var creationTimeMillis: Long? = null,
+    var connectTimeMillis: Long? = null
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
@@ -388,7 +400,9 @@ data class TeleCall(
             "speaker" to (speaker ?: false),
             "direction" to (direction ?: "UNKNOWN"),
             "remoteNumber" to (remoteNumber ?: ""),
-            "remoteName" to (remoteName ?: "")
+            "remoteName" to (remoteName ?: ""),
+            "creationTimeMillis" to (creationTimeMillis ?: 0L),
+            "connectTimeMillis" to (connectTimeMillis ?: 0L)
         )
     }
 }
