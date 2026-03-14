@@ -214,7 +214,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> answerCall(TeleCall call) async {
+  Future<dynamic> answer(TeleCall call) async {
     try {
       return await _channel.invokeMethod('answerCall', call.id);
     } on PlatformException catch (e) {
@@ -222,7 +222,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> hangupCall(TeleCall call) async {
+  Future<dynamic> hangup(TeleCall call) async {
     try {
       return await _channel.invokeMethod('hangupCall', call.id);
     } on PlatformException catch (e) {
@@ -230,7 +230,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> declineCall(TeleCall call) async {
+  Future<dynamic> decline(TeleCall call) async {
     try {
       return await _channel.invokeMethod('declineCall', call.id);
     } on PlatformException catch (e) {
@@ -238,7 +238,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> holdCall(TeleCall call) async {
+  Future<dynamic> hold(TeleCall call) async {
     try {
       return await _channel.invokeMethod('holdCall', call.id);
     } on PlatformException catch (e) {
@@ -246,7 +246,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> unholdCall(TeleCall call) async {
+  Future<dynamic> unhold(TeleCall call) async {
     try {
       return await _channel.invokeMethod('unholdCall', call.id);
     } on PlatformException catch (e) {
@@ -254,7 +254,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> muteCall(TeleCall call) async {
+  Future<dynamic> mute(TeleCall call) async {
     try {
       return await _channel.invokeMethod('muteCall', call.id);
     } on PlatformException catch (e) {
@@ -262,7 +262,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> unMuteCall(TeleCall call) async {
+  Future<dynamic> unmute(TeleCall call) async {
     try {
       return await _channel.invokeMethod('unMuteCall', call.id);
     } on PlatformException catch (e) {
@@ -270,7 +270,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> useSpeaker(TeleCall call) async {
+  Future<dynamic> speaker(TeleCall call) async {
     try {
       return await _channel.invokeMethod('useSpeaker', call.id);
     } on PlatformException catch (e) {
@@ -278,7 +278,7 @@ class TeleEndpoint {
     }
   }
 
-  Future<dynamic> useEarpiece(TeleCall call) async {
+  Future<dynamic> earpiece(TeleCall call) async {
     try {
       return await _channel.invokeMethod('useEarpiece', call.id);
     } on PlatformException catch (e) {

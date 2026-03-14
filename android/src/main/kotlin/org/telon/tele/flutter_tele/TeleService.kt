@@ -6,6 +6,7 @@ import android.os.IBinder
 import android.telecom.Call
 import android.telecom.InCallService
 import android.telecom.TelecomManager
+import android.telecom.PhoneAccountHandle
 import android.telephony.TelephonyManager
 import android.telephony.SubscriptionManager
 import android.util.Log
@@ -93,27 +94,54 @@ class TeleService : InCallService() {
 
     private fun makeCall(sim: Int, destination: String, callSettings: String?, msgData: String?) {
         try {
-            Log.d(TAG, "Making call to $destination on SIM $sim")
+            Log.d(TAG, "Making call to $destination on SIM slot $sim (0-indexed)")
             val telecomManager = getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+            val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+            
             val uri = Uri.parse("tel:$destination")
             val extras = Bundle()
             
-            try {
-                val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+            if (ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
                 val phoneAccounts = telecomManager.callCapablePhoneAccounts
-                if (phoneAccounts.isNotEmpty()) {
-                    val phoneAccount = phoneAccounts.getOrNull(sim - 1) ?: phoneAccounts.first()
-                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, phoneAccount)
+                val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
+                
+                var selectedAccount: PhoneAccountHandle? = null
+                
+                if (activeSubscriptions != null) {
+                    // Find the subscription for the requested slot
+                    val targetSub = activeSubscriptions.find { it.simSlotIndex == sim }
+                    if (targetSub != null) {
+                        val subId = targetSub.subscriptionId.toString()
+                        Log.d(TAG, "Target subscription ID: $subId for slot $sim")
+                        
+                        // Try to find the PhoneAccountHandle that corresponds to this subId
+                        for (handle in phoneAccounts) {
+                            val account = telecomManager.getPhoneAccount(handle)
+                            // On many devices, the handle ID is the subId.
+                            // On others, we might need to check more deeply or use the account label.
+                            if (handle.id.contains(subId)) {
+                                selectedAccount = handle
+                                break
+                            }
+                        }
+                    }
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Could not set phone account handle: ${e.message}")
+                
+                // Fallback to indexing if mapping failed
+                if (selectedAccount == null && phoneAccounts.isNotEmpty()) {
+                    Log.d(TAG, "Mapping by subId failed, falling back to index $sim")
+                    selectedAccount = phoneAccounts.getOrNull(sim) ?: phoneAccounts.first()
+                }
+                
+                if (selectedAccount != null) {
+                    Log.d(TAG, "Final Selected PhoneAccountHandle: $selectedAccount")
+                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, selectedAccount)
+                }
             }
 
             if (ActivityCompat.checkSelfPermission(this, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
                 telecomManager.placeCall(uri, extras)
                 Log.d(TAG, "Call placed via TelecomManager")
-                // Note: We do NOT send a call_received event here. 
-                // We let the OS route it back to onCallAdded natively to prevent duplication.
             } else {
                 Log.e(TAG, "CALL_PHONE permission not granted")
                 FlutterTelePlugin.getInstance()?.sendEvent("call_error", mapOf(
@@ -294,19 +322,39 @@ class TeleService : InCallService() {
             else -> "INITIATING"
         }
         
+        // Try to determine which SIM this call is on
+        var simSlot = 0
+        val accountHandle = call.details.accountHandle
+        if (accountHandle != null && ActivityCompat.checkSelfPermission(this, Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+            try {
+                val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as SubscriptionManager
+                val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
+                if (activeSubscriptions != null) {
+                    val sub = activeSubscriptions.find { accountHandle.id.contains(it.subscriptionId.toString()) }
+                    if (sub != null) {
+                        simSlot = sub.simSlotIndex
+                    }
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Error determining SIM slot: ${e.message}")
+            }
+        }
+
+        val creationTime = if (call.details.creationTimeMillis > 0) call.details.creationTimeMillis else System.currentTimeMillis()
+        
         val teleCall = TeleCall(
             id = teleCallIds,
             destination = remoteNumber,
-            sim = 1, 
+            sim = simSlot, 
             state = stateStr,
             direction = direction,
             remoteNumber = remoteNumber,
             remoteName = remoteName,
-            creationTimeMillis = call.details.creationTimeMillis
+            creationTimeMillis = creationTime
         )
         
         if (call.state == Call.STATE_ACTIVE) {
-            teleCall.connectTimeMillis = call.details.connectTimeMillis
+            teleCall.connectTimeMillis = if (call.details.connectTimeMillis > 0) call.details.connectTimeMillis else System.currentTimeMillis()
         }
         
         mCalls.add(teleCall)
@@ -321,10 +369,13 @@ class TeleService : InCallService() {
                 
                 teleCall.state = when (state) {
                     Call.STATE_RINGING -> "RINGING"
-                    Call.STATE_DISCONNECTED -> "DISCONNECTED"
+                    Call.STATE_DISCONNECTED -> {
+                        teleCall.disconnectTimeMillis = System.currentTimeMillis()
+                        "DISCONNECTED"
+                    }
                     Call.STATE_ACTIVE -> {
-                        if (teleCall.connectTimeMillis == 0L) {
-                            teleCall.connectTimeMillis = call.details.connectTimeMillis
+                        if (teleCall.connectTimeMillis == null || teleCall.connectTimeMillis == 0L) {
+                            teleCall.connectTimeMillis = if (call.details.connectTimeMillis > 0) call.details.connectTimeMillis else System.currentTimeMillis()
                         }
                         "ACTIVE"
                     }
@@ -340,6 +391,7 @@ class TeleService : InCallService() {
             override fun onCallDestroyed(call: Call) {
                 super.onCallDestroyed(call)
                 teleCall.state = "DISCONNECTED"
+                teleCall.disconnectTimeMillis = System.currentTimeMillis()
                 FlutterTelePlugin.getInstance()?.sendEvent("call_terminated", teleCall.toMap() as Map<String, Any>)
                 mCalls.remove(teleCall)
                 callMapping.remove(teleCall.id)
@@ -387,7 +439,8 @@ data class TeleCall(
     var remoteNumber: String? = null,
     var remoteName: String? = null,
     var creationTimeMillis: Long? = null,
-    var connectTimeMillis: Long? = null
+    var connectTimeMillis: Long? = null,
+    var disconnectTimeMillis: Long? = null
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
@@ -402,7 +455,8 @@ data class TeleCall(
             "remoteNumber" to (remoteNumber ?: ""),
             "remoteName" to (remoteName ?: ""),
             "creationTimeMillis" to (creationTimeMillis ?: 0L),
-            "connectTimeMillis" to (connectTimeMillis ?: 0L)
+            "connectTimeMillis" to (connectTimeMillis ?: 0L),
+            "disconnectTimeMillis" to (disconnectTimeMillis ?: 0L)
         )
     }
 }

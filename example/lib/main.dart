@@ -19,7 +19,7 @@ class _MyAppState extends State<MyApp> {
   List<TeleCall> _calls = [];
   TeleCall? _currentCall;
   String _phoneNumber = '';
-  int _selectedSim = 1;
+  int _selectedSim = 0;
   bool _hasPermissions = false;
   bool _isDefaultDialer = false;
   bool _canSetDefaultDialer = false;
@@ -195,7 +195,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.answerCall(_currentCall!);
+      await _endpoint.answer(_currentCall!);
       setState(() {
         _status = 'Call answered';
       });
@@ -216,7 +216,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.hangupCall(_currentCall!);
+      await _endpoint.hangup(_currentCall!);
       setState(() {
         _status = 'Call hung up';
         _currentCall = null;
@@ -238,7 +238,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.declineCall(_currentCall!);
+      await _endpoint.decline(_currentCall!);
       setState(() {
         _status = 'Call declined';
         _currentCall = null;
@@ -260,7 +260,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.muteCall(_currentCall!);
+      await _endpoint.mute(_currentCall!);
       setState(() {
         _status = 'Call muted';
       });
@@ -281,7 +281,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.unMuteCall(_currentCall!);
+      await _endpoint.unmute(_currentCall!);
       setState(() {
         _status = 'Call unmuted';
       });
@@ -302,7 +302,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.useSpeaker(_currentCall!);
+      await _endpoint.speaker(_currentCall!);
       setState(() {
         _status = 'Speaker enabled';
       });
@@ -323,7 +323,7 @@ class _MyAppState extends State<MyApp> {
     }
 
     try {
-      await _endpoint.useEarpiece(_currentCall!);
+      await _endpoint.earpiece(_currentCall!);
       setState(() {
         _status = 'Earpiece enabled';
       });
@@ -482,12 +482,12 @@ class _MyAppState extends State<MyApp> {
                           DropdownButton<int>(
                             value: _selectedSim,
                             items: const [
-                              DropdownMenuItem(value: 1, child: Text('SIM 1')),
-                              DropdownMenuItem(value: 2, child: Text('SIM 2')),
+                              DropdownMenuItem(value: 0, child: Text('SIM 1')),
+                              DropdownMenuItem(value: 1, child: Text('SIM 2')),
                             ],
                             onChanged: (value) {
                               setState(() {
-                                _selectedSim = value ?? 1;
+                                _selectedSim = value ?? 0;
                               });
                             },
                           ),

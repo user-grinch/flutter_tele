@@ -10,7 +10,11 @@ enum CallState {
   unknown,
 }
 
-enum CallDirection { incoming, outgoing, unknown }
+enum CallDirection {
+  incoming,
+  outgoing,
+  unknown,
+}
 
 class TeleCall {
   final int id;
@@ -22,7 +26,9 @@ class TeleCall {
   final bool held;
   final bool muted;
   final bool speaker;
+  final int? creationTimeMillis;
   final int? connectTimeMillis;
+  final int? disconnectTimeMillis;
   final String? disconnectCause;
 
   TeleCall({
@@ -35,20 +41,43 @@ class TeleCall {
     this.held = false,
     this.muted = false,
     this.speaker = false,
+    this.creationTimeMillis,
     this.connectTimeMillis,
+    this.disconnectTimeMillis,
     this.disconnectCause,
   });
+
+  /// Connected duration (from when the call was answered)
+  Duration get duration {
+    if (connectTimeMillis == null || connectTimeMillis == 0) {
+      return Duration.zero;
+    }
+    final endTime = (disconnectTimeMillis != null && disconnectTimeMillis! > 0)
+        ? disconnectTimeMillis!
+        : DateTime.now().millisecondsSinceEpoch;
+    return Duration(milliseconds: endTime - connectTimeMillis!);
+  }
+
+  /// Total duration (from when the call was initiated/received)
+  Duration get totalDuration {
+    if (creationTimeMillis == null || creationTimeMillis == 0) {
+      return Duration.zero;
+    }
+    final endTime = (disconnectTimeMillis != null && disconnectTimeMillis! > 0)
+        ? disconnectTimeMillis!
+        : DateTime.now().millisecondsSinceEpoch;
+    return Duration(milliseconds: endTime - creationTimeMillis!);
+  }
 
   factory TeleCall.fromMap(dynamic event) {
     final map = Map<String, dynamic>.from(event as Map);
 
+    // Parsing logic for remoteUri if it exists (fallback)
     String? parsedRemoteNumber;
     String? parsedRemoteName;
     final remoteUri = map['remoteUri'] ?? '';
     if (remoteUri.isNotEmpty) {
-      final nameMatch = RegExp(
-        r'"([^"]+)" <sip:([^@]+)@',
-      ).firstMatch(remoteUri);
+      final nameMatch = RegExp(r'"([^"]+)" <sip:([^@]+)@').firstMatch(remoteUri);
       if (nameMatch != null) {
         parsedRemoteName = nameMatch.group(1);
         parsedRemoteNumber = nameMatch.group(2);
@@ -124,7 +153,9 @@ class TeleCall {
       held: map['held'] ?? false,
       muted: map['muted'] ?? false,
       speaker: map['speaker'] ?? false,
+      creationTimeMillis: map['creationTimeMillis'],
       connectTimeMillis: map['connectTimeMillis'],
+      disconnectTimeMillis: map['disconnectTimeMillis'],
       disconnectCause: map['disconnectCause'],
     );
   }
@@ -140,13 +171,15 @@ class TeleCall {
       'held': held,
       'muted': muted,
       'speaker': speaker,
+      'creationTimeMillis': creationTimeMillis,
       'connectTimeMillis': connectTimeMillis,
+      'disconnectTimeMillis': disconnectTimeMillis,
       'disconnectCause': disconnectCause,
     };
   }
 
   @override
   String toString() {
-    return 'TeleCall(id: $id, state: $state, direction: $direction, number: $remoteNumber)';
+    return 'TeleCall(id: $id, state: $state, direction: $direction, number: $remoteNumber, duration: ${duration.inSeconds}s)';
   }
 }
