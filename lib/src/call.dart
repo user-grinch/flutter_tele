@@ -1,3 +1,15 @@
+enum CallState {
+  initiating,
+  incoming,
+  ringing,
+  outgoing,
+  connected,
+  disconnected,
+  muted,
+  hold,
+  unknown,
+}
+
 class TeleCall {
   final int id;
   final String? callId;
@@ -34,7 +46,7 @@ class TeleCall {
   final int? simSlot;
   final int? simSlot1;
   final int? simSlot2;
-  
+
   final String? remoteNumber;
   final String? remoteName;
 
@@ -78,49 +90,91 @@ class TeleCall {
     this.remoteName,
   });
 
-  factory TeleCall.fromMap(Map<String, dynamic> map) {
-    print('FlutterTele: TeleCall.fromMap called with: $map');
-    
-    String? remoteNumber;
-    String? remoteName;
+  CallState get currentCallState {
+    switch (state?.toUpperCase()) {
+      case 'INITIATING':
+        return CallState.initiating;
+      case 'INCOMING':
+        return CallState.incoming;
+      case 'RINGING':
+        return CallState.ringing;
+      case 'DIALING':
+      case 'CONNECTING':
+      case 'OUTGOING':
+        return CallState.outgoing;
+      case 'ACTIVE':
+      case 'CONNECTED':
+        return CallState.connected;
+      case 'DISCONNECTED':
+      case 'DECLINED':
+      case 'PJSIP_INV_STATE_DISCONNECTED':
+        return CallState.disconnected;
+      case 'HOLDING':
+      case 'HOLD':
+        return CallState.hold;
+      case 'MUTED':
+        return CallState.muted;
+      default:
+        return CallState.unknown;
+    }
+  }
 
-    if (map['remoteUri'] != null) {
-      final remoteUri = map['remoteUri'] as String;
+  factory TeleCall.fromMap(dynamic event) {
+    // Safely cast the raw event map coming from the platform channel
+    final map = Map<String, dynamic>.from(event as Map);
+    print('FlutterTele: TeleCall.fromMap called with: $map');
+
+    String? parsedRemoteNumber;
+    String? parsedRemoteName;
+
+    // Apply default fallback for remoteUri
+    final remoteUri = map['remoteUri'] ?? '';
+
+    if (remoteUri.isNotEmpty) {
       print('FlutterTele: Parsing remoteUri: $remoteUri');
-      
+
       // Parse remote URI to extract name and number
-      final nameMatch = RegExp(r'"([^"]+)" <sip:([^@]+)@').firstMatch(remoteUri);
+      final nameMatch = RegExp(
+        r'"([^"]+)" <sip:([^@]+)@',
+      ).firstMatch(remoteUri);
       if (nameMatch != null) {
-        remoteName = nameMatch.group(1);
-        remoteNumber = nameMatch.group(2);
-        print('FlutterTele: Found name and number from SIP URI: $remoteName, $remoteNumber');
+        parsedRemoteName = nameMatch.group(1);
+        parsedRemoteNumber = nameMatch.group(2);
+        print(
+          'FlutterTele: Found name and number from SIP URI: $parsedRemoteName, $parsedRemoteNumber',
+        );
       } else {
         final numberMatch = RegExp(r'sip:([^@]+)@').firstMatch(remoteUri);
         if (numberMatch != null) {
-          remoteNumber = numberMatch.group(1);
-          print('FlutterTele: Found number from SIP URI: $remoteNumber');
+          parsedRemoteNumber = numberMatch.group(1);
+          print('FlutterTele: Found number from SIP URI: $parsedRemoteNumber');
         }
       }
 
       final telMatch = RegExp(r'tel:([^@]+)').firstMatch(remoteUri);
       if (telMatch != null) {
-        remoteNumber = Uri.decodeComponent(telMatch.group(1)!);
-        print('FlutterTele: Found number from tel URI: $remoteNumber');
+        parsedRemoteNumber = Uri.decodeComponent(telMatch.group(1)!);
+        print('FlutterTele: Found number from tel URI: $parsedRemoteNumber');
       }
     }
 
-    // Use remoteNumber and remoteName from map if available, otherwise use parsed values
-    final finalRemoteNumber = map['remoteNumber'] ?? remoteNumber;
-    final finalRemoteName = map['remoteName'] ?? remoteName;
-    
-    print('FlutterTele: Final remoteNumber: $finalRemoteNumber, remoteName: $finalRemoteName');
+    // Resolution for finalRemoteNumber including the empty/destination fallback
+    String? finalRemoteNumber = map['remoteNumber'] ?? parsedRemoteNumber;
+    if (finalRemoteNumber == null || finalRemoteNumber.isEmpty) {
+      finalRemoteNumber = map['destination']?.toString();
+    }
 
-    // Helper function to convert Map<Object?, Object?> to Map<String, dynamic>
-    Map<String, dynamic>? convertMap(dynamic value) {
+    final finalRemoteName = map['remoteName'] ?? parsedRemoteName;
+    print(
+      'FlutterTele: Final remoteNumber: $finalRemoteNumber, remoteName: $finalRemoteName',
+    );
+
+    // Helper function that now guarantees a Map is returned (no nulls)
+    Map<String, dynamic> convertMap(dynamic value) {
       if (value is Map) {
         return value.map((k, v) => MapEntry(k.toString(), v));
       }
-      return null;
+      return <String, dynamic>{};
     }
 
     final call = TeleCall(
@@ -130,14 +184,14 @@ class TeleCall {
       localContact: map['localContact'],
       localUri: map['localUri'],
       remoteContact: map['remoteContact'],
-      remoteUri: map['remoteUri'],
+      remoteUri: remoteUri,
       state: map['state'],
-      stateText: map['stateText'],
+      stateText: map['stateText'] ?? map['state'], // Fallback to state
       held: map['held'],
       muted: map['muted'],
       speaker: map['speaker'],
-      connectDuration: map['connectDuration'],
-      totalDuration: map['totalDuration'],
+      connectDuration: map['connectDuration'] ?? 0, // Fallback to 0
+      totalDuration: map['totalDuration'] ?? 0, // Fallback to 0
       remoteOfferer: map['remoteOfferer'],
       remoteAudioCount: map['remoteAudioCount'],
       remoteVideoCount: map['remoteVideoCount'],
@@ -145,25 +199,29 @@ class TeleCall {
       videoCount: map['videoCount'],
       lastStatusCode: map['lastStatusCode'],
       lastReason: map['lastReason'],
-      media: convertMap(map['media']),
-      provisionalMedia: convertMap(map['provisionalMedia']),
+      media: convertMap(map['media']), // Will default to {}
+      provisionalMedia: convertMap(
+        map['provisionalMedia'],
+      ), // Will default to {}
       creationTime: map['creationTime'],
       connectTime: map['connectTime'],
-      details: convertMap(map['details']),
+      details: convertMap(map['details']), // Will default to {}
       callHashCode: map['hashCode'],
-      extras: convertMap(map['extras']),
+      extras: convertMap(map['extras']), // Will default to {}
       connectTimeMillis: map['connectTimeMillis'],
       creationTimeMillis: map['creationTimeMillis'],
       disconnectCause: map['disconnectCause'],
       direction: map['direction'],
-      simSlot: map['simSlot'],
+      simSlot: map['simSlot'] ?? map['sim'], // Map sim to simSlot
       simSlot1: map['simSlot1'],
       simSlot2: map['simSlot2'],
       remoteNumber: finalRemoteNumber,
       remoteName: finalRemoteName,
     );
-    
-    print('FlutterTele: Created TeleCall with id: ${call.id}, state: ${call.state}, remoteNumber: ${call.remoteNumber}');
+
+    print(
+      'FlutterTele: Created TeleCall with id: ${call.id}, state: ${call.state}, remoteNumber: ${call.remoteNumber}',
+    );
     return call;
   }
 
@@ -245,7 +303,9 @@ class TeleCall {
   }
 
   int getConnectDuration() {
-    if (connectDuration == null || connectDuration! < 0 || state == 'PJSIP_INV_STATE_DISCONNECTED') {
+    if (connectDuration == null ||
+        connectDuration! < 0 ||
+        state == 'PJSIP_INV_STATE_DISCONNECTED') {
       return connectDuration ?? 0;
     }
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
@@ -267,4 +327,4 @@ class TeleCall {
   String toString() {
     return 'TeleCall{id: $id, state: $state, remoteNumber: $remoteNumber, remoteName: $remoteName}';
   }
-} 
+}
