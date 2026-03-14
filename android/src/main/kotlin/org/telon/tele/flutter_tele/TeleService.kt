@@ -340,8 +340,6 @@ class TeleService : InCallService() {
             }
         }
 
-        val creationTime = if (call.details.creationTimeMillis > 0) call.details.creationTimeMillis else System.currentTimeMillis()
-        
         val teleCall = TeleCall(
             id = teleCallIds,
             destination = remoteNumber,
@@ -349,8 +347,7 @@ class TeleService : InCallService() {
             state = stateStr,
             direction = direction,
             remoteNumber = remoteNumber,
-            remoteName = remoteName,
-            creationTimeMillis = creationTime
+            remoteName = remoteName
         )
         
         if (call.state == Call.STATE_ACTIVE) {
@@ -370,7 +367,6 @@ class TeleService : InCallService() {
                 teleCall.state = when (state) {
                     Call.STATE_RINGING -> "RINGING"
                     Call.STATE_DISCONNECTED -> {
-                        teleCall.disconnectTimeMillis = System.currentTimeMillis()
                         "DISCONNECTED"
                     }
                     Call.STATE_ACTIVE -> {
@@ -391,7 +387,6 @@ class TeleService : InCallService() {
             override fun onCallDestroyed(call: Call) {
                 super.onCallDestroyed(call)
                 teleCall.state = "DISCONNECTED"
-                teleCall.disconnectTimeMillis = System.currentTimeMillis()
                 FlutterTelePlugin.getInstance()?.sendEvent("call_terminated", teleCall.toMap() as Map<String, Any>)
                 mCalls.remove(teleCall)
                 callMapping.remove(teleCall.id)
@@ -438,15 +433,13 @@ data class TeleCall(
     val direction: String? = null,
     var remoteNumber: String? = null,
     var remoteName: String? = null,
-    var creationTimeMillis: Long? = null,
-    var connectTimeMillis: Long? = null,
-    var disconnectTimeMillis: Long? = null
+    var connectTimeMillis: Long? = null
 ) {
     fun toMap(): Map<String, Any> {
         return mapOf(
             "id" to id,
             "destination" to (destination ?: ""),
-            "sim" to (sim ?: 1),
+            "sim" to (sim ?: 0),
             "state" to (state ?: "UNKNOWN"),
             "held" to (held ?: false),
             "muted" to (muted ?: false),
@@ -454,9 +447,7 @@ data class TeleCall(
             "direction" to (direction ?: "UNKNOWN"),
             "remoteNumber" to (remoteNumber ?: ""),
             "remoteName" to (remoteName ?: ""),
-            "creationTimeMillis" to (creationTimeMillis ?: 0L),
-            "connectTimeMillis" to (connectTimeMillis ?: 0L),
-            "disconnectTimeMillis" to (disconnectTimeMillis ?: 0L)
+            "connectTimeMillis" to (connectTimeMillis ?: 0L)
         )
     }
 }

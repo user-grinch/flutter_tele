@@ -14,7 +14,6 @@ void main() {
         'held': false,
         'muted': false,
         'speaker': false,
-        'creationTimeMillis': 1000,
         'connectTimeMillis': 2000,
       };
 
@@ -28,7 +27,6 @@ void main() {
       expect(call.held, equals(false));
       expect(call.muted, equals(false));
       expect(call.speaker, equals(false));
-      expect(call.creationTimeMillis, equals(1000));
       expect(call.connectTimeMillis, equals(2000));
     });
 
@@ -42,7 +40,6 @@ void main() {
         held: false,
         muted: false,
         speaker: false,
-        creationTimeMillis: 1000,
         connectTimeMillis: 2000,
       );
 
@@ -56,7 +53,6 @@ void main() {
       expect(map['held'], equals(false));
       expect(map['muted'], equals(false));
       expect(map['speaker'], equals(false));
-      expect(map['creationTimeMillis'], equals(1000));
       expect(map['connectTimeMillis'], equals(2000));
     });
 
@@ -68,11 +64,9 @@ void main() {
         remoteNumber: '+1234567890',
         remoteName: 'Test User',
         direction: CallDirection.incoming,
-        creationTimeMillis: now - 5000, // 5 seconds ago
         connectTimeMillis: now - 3000, // 3 seconds ago
       );
 
-      expect(call.totalDuration.inSeconds, closeTo(5, 1));
       expect(call.duration.inSeconds, closeTo(3, 1));
     });
 
