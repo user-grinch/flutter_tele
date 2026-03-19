@@ -36,4 +36,13 @@ class TeleDialer {
   static Future<bool> requestDefaultDialer() async {
     return await setDefaultDialer();
   }
+
+  static bool isUssd(String number) {
+    return number.contains('*') && number.contains('#');
+  }
+
+  static Future<void> dialUssd(String code) async {
+    print("TEST");
+    await _channel.invokeMethod('dialUssd', {'code': code});
+  }
 }

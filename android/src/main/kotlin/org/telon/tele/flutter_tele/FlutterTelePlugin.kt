@@ -20,6 +20,12 @@ import android.os.Build
 import android.telecom.TelecomManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import android.os.Bundle
+
+import android.telephony.TelephonyManager
+import android.os.Handler
+import android.os.Looper
+import android.net.Uri
 
 /** FlutterTelePlugin */
 class FlutterTelePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener {
@@ -105,6 +111,7 @@ class FlutterTelePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plugin
           result.error("INVALID_ARGUMENTS", "Invalid call ID", null)
         }
       }
+      "dialUssd" -> handleUssdAction(call, result)
       else -> result.notImplemented()
     }
   }
@@ -215,6 +222,34 @@ class FlutterTelePlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Plugin
           result.error("INVALID_ARGUMENTS", "Invalid call ID", null)
       }
   }
+private fun handleUssdAction(call: MethodCall, result: Result) {
+    try {
+        // Get the USSD code from Flutter, default to "*566#"
+        val code = call.argument<String>("code") ?: "*566#"
+
+        // Encode the USSD properly
+        val encodedCode = Uri.encode(code)
+        val uri = Uri.parse("tel:$encodedCode")
+
+        // Get TelecomManager
+        val telecomManager =
+            context.getSystemService(Context.TELECOM_SERVICE) as TelecomManager
+
+        // Optional extras for call settings
+        val extras = Bundle().apply {
+            putBoolean(TelecomManager.EXTRA_START_CALL_WITH_SPEAKERPHONE, false)
+        }
+
+        // Place the call
+        telecomManager.placeCall(uri, extras)
+
+        Log.d(TAG, "USSD dial initiated: $code")
+        result.success("USSD request sent via TelecomManager")
+    } catch (e: Exception) {
+        Log.e(TAG, "USSD dial failed", e)
+        result.error("USSD_ERROR", e.message, null)
+    }
+}
 
   private fun startTelephonyService(configuration: Map<String, Any>?, result: Result) {
     try {

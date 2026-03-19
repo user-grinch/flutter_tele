@@ -267,13 +267,14 @@ class TeleService : InCallService() {
         try {
             val teleCall = findCall(callId)
             if (teleCall != null) {
-                mAudioManager?.mode = AudioManager.MODE_NORMAL
-                mAudioManager?.isSpeakerphoneOn = true
+                setAudioRoute(android.telecom.CallAudioState.ROUTE_SPEAKER)
+                
                 teleCall.speaker = true
-                FlutterTelePlugin.getInstance()?.sendEvent("call_changed", teleCall.toMap() as Map<String, Any>)
+                FlutterTelePlugin.getInstance()?.sendEvent("call_changed", teleCall.toMap())
+                Log.d(TAG, "Audio route changed to SPEAKER for call: $callId")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error using speaker", e)
+            Log.e(TAG, "Error switching to speaker", e)
         }
     }
 
@@ -281,13 +282,14 @@ class TeleService : InCallService() {
         try {
             val teleCall = findCall(callId)
             if (teleCall != null) {
-                mAudioManager?.mode = AudioManager.MODE_IN_COMMUNICATION
-                mAudioManager?.isSpeakerphoneOn = false
+                setAudioRoute(android.telecom.CallAudioState.ROUTE_WIRED_OR_EARPIECE)
+                
                 teleCall.speaker = false
-                FlutterTelePlugin.getInstance()?.sendEvent("call_changed", teleCall.toMap() as Map<String, Any>)
+                FlutterTelePlugin.getInstance()?.sendEvent("call_changed", teleCall.toMap())
+                Log.d(TAG, "Audio route changed to EARPIECE for call: $callId")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error using earpiece", e)
+            Log.e(TAG, "Error switching to earpiece", e)
         }
     }
 
